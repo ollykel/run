@@ -8,11 +8,13 @@ package main
  */
 
 import (
+	"errors"
 	"os"
 	"fmt"
 	"io"
 	"bufio"
 	"log"
+	"strings"
 )
 
 type color string
@@ -46,6 +48,25 @@ func PrintColor (w io.Writer, r io.Reader, col color) {
 	}//-- end infinite for
 }//-- end func PrintColor
 
+var ErrExecutableNotFound = errors.New("executable not found")
+
+func GetExecutableName (name string) (string, error) {
+	path, exists := os.LookupEnv("PATH")
+	if !exists { log.Fatal("PATH environment var not found") }
+	paths := strings.Split(path, ":")
+	paths = append([]string{ "." }, paths...)
+	var (
+		filename string
+		err error
+	)
+	for i := range paths {
+		filename = paths[i] + "/" + name
+		_, err = os.Stat(filename)
+		if err == nil { return filename, nil }
+	}//-- end for range paths
+	return "", ErrExecutableNotFound
+}//-- end func GetExecutableName
+
 func main() {
 	if len(os.Args) < 2 { log.Fatal("requires at least one arg") }
 	stderrReader, stderrWriter, err := os.Pipe()
@@ -54,7 +75,13 @@ func main() {
 	attribs := os.ProcAttr{
 		Files: []*os.File { os.Stdin, os.Stdout, stderrWriter } }
 	go PrintColor(os.Stderr, stderrReader, Red)
-	procName := os.Args[1]
+	procName, err := GetExecutableName(os.Args[1])
+	if err == ErrExecutableNotFound {
+		fmt.Fprintf(os.Stderr, "\x1b[31m\"%s\" not found\n\x1b[0m",
+			os.Args[1])
+		return
+	}
+	if err != nil { log.Fatal(err) }
 	proc, err := os.StartProcess(procName, os.Args[1:], &attribs)
 	if err != nil { log.Fatal(err.Error()) }
 	_, err = proc.Wait()
