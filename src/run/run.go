@@ -68,7 +68,11 @@ func GetExecutableName (name string) (string, error) {
 }//-- end func GetExecutableName
 
 func main() {
-	if len(os.Args) < 2 { log.Fatal("requires at least one arg") }
+	if len(os.Args) < 2 {
+		fmt.Fprint(os.Stderr,
+			"\x1b[8mrun requires at least one arg\n\x1b[0m")
+		return
+	}
 	stderrReader, stderrWriter, err := os.Pipe()
 	defer stderrReader.Close()
 	if err != nil { log.Fatal(err.Error()) }
